@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juego de la Oca</title>
+    <link rel="stylesheet" href="JuegoOca_PAC.css">
+</head>
+<body>
+    <div id="game-board">
+        <!-- Aquí se generará el tablero del juego con casillas -->
+    </div>
+	<div id="controls">
+    <div style="color:white; padding:10px" id="dice-value"></div>
+    <br>
+	
+    <select id="num-players">
+        <option value="2">2 Jugadores</option>
+        <option value="3">3 Jugadores</option>
+        <option value="4">4 Jugadores</option>
+    </select>
+    <br>
+    <br>
+	<div class="button-container">
+	<button id="reset-game-btn">Volver a empezar</button>
+	<button id="roll-dice-btn">Tirar Dado</button>
+	</div>
+	<div style="color:white; padding:10px">*El color del botón indica el turno del jugador</div>
+	</div>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            const gameBoard = $("#game-board");
+            const rollDiceBtn = $("#roll-dice-btn");
+            const numPlayersSelect = $("#num-players");
+            const cells = [];
+            const players = [];
+            let currentPlayerIndex = 0;
+            let gameFinished = false;
+            let playerPositions = {}; // Almacena las posiciones de llegada de cada jugador
+            
+// Crear casillas del tablero con números (comenzando desde la segunda casilla)
+for (let i = 1; i <= 64; i++) {
+    const cell = $("<div>").addClass("cell");
+    
+    // Verificar si no es la primera y última casilla para agregar el número
+    if (i > 1 && i < 64) {
+        const numberText = $("<span>").addClass("cell-number").text(i - 1); // Crear elemento de texto con el número de la casilla
+        cell.append(numberText); // Agregar el número a la casilla
+    }
+    
+    cells.push(cell);
+    gameBoard.append(cell);
+}
+    alert("El juego consiste en llegar en primer lugar a la casilla 63. Cada uno de los jugadores tirara el dado en un orden establecido tras elegir la cantidad de participantes. El botón indicara mediante el color, el turno del jugador. Suerte a todos!");
+
+// Función para inicializar jugadores
+function initializePlayers(numPlayers) {
+    for (let i = 0; i < numPlayers; i++) {
+        const player = $("<div>").addClass("player").addClass("player" + (i + 1)).attr("id", "player" + (i + 1));
+        players.push(player);
+        cells[0].append(player);
+    }
+	playerFinishOrder = []
+    // Reiniciar posiciones de jugadores que han llegado a la meta en el juego anterior
+    Object.keys(playerPositions).forEach(playerIndex => {
+        delete playerPositions[playerIndex]; // Eliminar las posiciones registradas de los jugadores que han llegado a la meta
+    });
+}
+
+// Variable para mantener un seguimiento del orden en que los jugadores llegan a la meta
+let playerFinishOrder = [];
+
+function movePlayer(steps) {
+    const currentPlayer = players[currentPlayerIndex];
+
+    // Encontrar la posición actual del jugador
+    let currentPosition;
+    cells.forEach((cell, index) => {
+        if (cell.find('.player').is(currentPlayer)) {
+            currentPosition = index;
+        }
+    });
+
+    const currentRow = Math.floor(currentPosition / 8); // Calcular la fila actual
+    const currentColumn = currentPosition % 8; // Calcular la columna actual
+    let newPosition = currentPosition + steps;
+
+    // Manejar cuando el jugador llega al final del tablero
+    if (newPosition >= 63) {
+        newPosition = cells.length - 1;
+        playerPositions[currentPlayerIndex] = newPosition; // Actualizar la posición del jugador a la meta
+        
+        // Registrar el orden en que el jugador llega a la meta
+        playerFinishOrder.push(currentPlayerIndex);
+    }
+
+    // Mover al jugador
+    currentPlayer.detach();
+    cells[newPosition].append(currentPlayer);
+    currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+
+    // Verificar si todos los jugadores han llegado a la última casilla
+    let allPlayersFinished = true;
+    for (let i = 0; i < players.length; i++) {
+        if (!(i in playerPositions)) {
+            allPlayersFinished = false;
+            break;
+        }
+    }
+
+    if (allPlayersFinished) {
+        gameFinished = true;
+        checkGameEnd(); // Comprobar si todos los jugadores han terminado el juego
+    }
+}
+
+// Función para indicar de quien es el turno
+function updateButtonColor() {
+    // Verificar si el jugador actual ha llegado a la meta
+    if (!isPlayerAtGoal()) {
+        const currentPlayerColor = players[currentPlayerIndex].css("background-color");
+        rollDiceBtn.css("background-color", currentPlayerColor);
+    }
+}
+
+// Función para tirar el dado
+function rollDice() {
+    if (!gameFinished) {
+        const currentPlayer = players[currentPlayerIndex];
+        
+        // Verificar si el jugador actual ya ha llegado a la última casilla
+        if (isPlayerAtGoal()) {
+            // Encontrar el siguiente jugador que aún no haya llegado a la meta
+            while (isPlayerAtGoal()) {
+                currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+            }
+            
+            // Actualizar el color del botón al siguiente jugador activo
+            updateButtonColor();
+            
+            // Tirar el dado automáticamente para el siguiente jugador
+            setTimeout(rollDice, 1000);
+            return;
+        }
+        
+        // Tirar el dado
+        const steps = Math.floor(Math.random() * 6) + 1;
+        $("#dice-value").text("Valor del dado: " + steps); // Actualizar el valor del dado en el elemento HTML
+        movePlayer(steps);
+        updateButtonColor(); // Actualizar el color del botón
+    }
+}
+
+
+
+// Evento para tirar el dado al hacer clic en el botón
+rollDiceBtn.on("click", rollDice);
+
+
+// Evento para cambiar el número de jugadores
+numPlayersSelect.on("change", function() {
+    const numPlayers = parseInt($(this).val());
+    if (numPlayers >= 2 && numPlayers <= 4) {
+        // Reiniciar juego
+        gameFinished = false;
+        currentPlayerIndex = 0;
+        players.forEach(player => player.remove());
+        players.length = 0;
+        initializePlayers(numPlayers);
+        $("#dice-value").text("");
+        rollDiceBtn.css("background-color", "lightblue");
+
+    }
+});
+
+// Inicializar jugadores con el número predeterminado
+initializePlayers(2);
+
+//Evento para resetear juego
+$("#reset-game-btn").click(function() {
+    gameFinished = false;
+    currentPlayerIndex = 0;
+    players.forEach(player => player.remove());
+    players.length = 0;
+    initializePlayers(2);
+    $("#dice-value").text("");
+    $("#num-players").val($("#num-players option:first").val());
+    rollDiceBtn.css("background-color", "lightblue");
+});
+
+
+
+// Función para verificar si el jugador actual ha llegado a la meta
+function isPlayerAtGoal() {
+    return playerPositions[currentPlayerIndex] !== undefined;
+}
+
+// Asociar cada jugador con un color específico
+const playerColors = {
+    0: "Azul",
+    1: "Rojo",
+    2: "Amarillo",
+    3: "Verde"
+};
+
+// Función para verificar si todos los jugadores han terminado el juego
+function checkGameEnd() {
+    let allPlayersFinished = true;
+    for (let i = 0; i < players.length; i++) {
+        if (!(i in playerPositions)) {
+            allPlayersFinished = false;
+            break;
+        }
+	$("#dice-value").text("Selecciona el número de jugadores");
+    }
+
+    if (allPlayersFinished) {
+    let positionsText = "El juego ha terminado. Posiciones de llegada:\n\n";
+    playerFinishOrder.forEach((playerIndex, index) => {
+        const playerColor = "Jugador " + (playerColors[playerIndex]);
+        positionsText += "Posición " + (index + 1) + " - " + playerColor + "\n";
+    });
+    alert(positionsText);
+	}
+	
+}
+});
+    </script>
+</body>
+</html>
